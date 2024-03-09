@@ -88,7 +88,9 @@ namespace PeterDB {
         RC openFile(const std::string &fileName, FileHandle &fileHandle);   // Open a record-based file
 
         RC closeFile(FileHandle &fileHandle);                               // Close a record-based file
-
+        void compactPage(char* page, int slotOffset, int slotLength);
+        RC findDeletedSlot(FileHandle &fileHandle, RID &rid);
+        RC updateSlotStatus(FileHandle &fileHandle, const RID &rid, int status);
         //  Format of the data passed into the function is the following:
         //  [n byte-null-indicators for y fields] [actual value for the first field] [actual value for the second field] ...
         //  1) For y fields, there is n-byte-null-indicators in the beginning of each record.

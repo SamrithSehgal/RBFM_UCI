@@ -21,7 +21,6 @@ namespace PeterDB {
     PagedFileManager &PagedFileManager::operator=(const PagedFileManager &) = default;
 
     RC PagedFileManager::createFile(const string &fileName) {
-
         int fileFound = access(fileName.c_str(), F_OK);
         if(fileFound == 0){
             cout << "Error this file already exists :(";
@@ -41,6 +40,8 @@ namespace PeterDB {
 
     RC PagedFileManager::destroyFile(const string &fileName) {
         int deleteSucsessful = remove(fileName.c_str());
+        string cVals = "counterVals";
+        remove(cVals.c_str());
         if(deleteSucsessful != 0){
             return -1;
             cout << "Error in deletion";
@@ -52,6 +53,7 @@ namespace PeterDB {
 
     RC PagedFileManager::openFile(const string &fileName, FileHandle &fileHandle) {
         FILE *foundFile = fopen(fileName.c_str(), "rb+wb");
+        fileHandle.ct.initCT();
         if(foundFile != NULL){
             
             fileHandle.fileName = fileName;
@@ -67,7 +69,9 @@ namespace PeterDB {
 
     RC PagedFileManager::closeFile(FileHandle &fileHandle) {
         FILE* fp = fileHandle.filePointer;
+        FILE* ctp = fileHandle.ct.trackerPointer;
         int sucsess = fclose(fp);
+        fclose(ctp);
         if(sucsess != 0){
             cout << "Error in closing file";
             return -1;
@@ -84,7 +88,6 @@ namespace PeterDB {
     FileHandle::~FileHandle() = default;
 
     RC FileHandle::readPage(PageNum pageNum, void *data) {
-
         if(pageNum >= getNumberOfPages()){
             cout << "Page doesnt exist";
             return -1;
@@ -99,12 +102,12 @@ namespace PeterDB {
             cout << "Error in reading file";
             return -1;
         }
-        readPageCounter++;
+        ct.writeRCounter();
+        //readPageCounter++;
         return 0;
     }
 
     RC FileHandle::writePage(PageNum pageNum, const void *data) {
-
         if(pageNum > getNumberOfPages()){
             cout << "Page doesnt exist";
             return -1;
@@ -121,7 +124,8 @@ namespace PeterDB {
             cout << "Error in writing to file file";
             return -1;
         }
-        writePageCounter++;
+        ct.writeWCounter();
+        //writePageCounter++;
         return 0;
     }
 
@@ -137,7 +141,8 @@ namespace PeterDB {
             cout << "Error in appending the page";
             return -1;
         }
-        appendPageCounter++;
+        ct.writeACounter();
+        //appendPageCounter++;
         return 0;
     }
 
@@ -153,11 +158,124 @@ namespace PeterDB {
     }
 
     RC FileHandle::collectCounterValues(unsigned &readPageCount, unsigned &writePageCount, unsigned &appendPageCount) {
-        readPageCount = readPageCounter;
+        readPageCount = ct.getRCounter();
+        writePageCount = ct.getWCounter();
+        appendPageCount = ct.getACounter(); 
+        /*readPageCount = readPageCounter;
         writePageCount = writePageCounter;
-        appendPageCount = appendPageCounter;
+        appendPageCount = appendPageCounter; */
 
         return 0;
     }
+
+
+    RC CounterTracker::initCT(){
+        unsigned rpc = 0;
+        unsigned wpc = 0;
+        unsigned apc = 0;
+        int fileFound = access(fileName.c_str(), F_OK);
+        if(fileFound == 0){
+            FILE *pfile = fopen(fileName.c_str(), "rb+wb");
+            trackerPointer = pfile;
+        }
+        else{
+            FILE *pfile = fopen(fileName.c_str(), "wb");
+            fclose(pfile);
+            FILE *reFile = fopen(fileName.c_str(), "rb+wb");
+            trackerPointer = reFile;
+            char* data = (char*) malloc(PAGE_SIZE);
+            memcpy(data, &rpc, sizeof(unsigned));
+            memcpy(data+sizeof(unsigned), &wpc, sizeof(unsigned));
+            memcpy(data+sizeof(unsigned) * 2, &apc, sizeof(unsigned));
+
+            size_t sucsess = fwrite(data, 1, PAGE_SIZE, trackerPointer);
+            if(sucsess != PAGE_SIZE){
+                cout << "couldnt write" << endl;
+                return -1;
+            }
+
+            fflush(trackerPointer);
+            free(data);
+        }
+        return 0;
+    }
+
+    RC CounterTracker::getRCounter(){
+        int findData = fseek(trackerPointer, 0, SEEK_SET);
+        unsigned rpc;
+        if(findData != 0){
+            cout << "Cant find read counter";
+            return -1;
+        }
+        fread(&rpc, sizeof(unsigned), 1, trackerPointer);
+        return rpc;
+    }
+
+    RC CounterTracker::getWCounter(){
+        int findData = fseek(trackerPointer, sizeof(unsigned), SEEK_SET);
+        unsigned wpc;
+        if(findData != 0){
+            cout << "Cant find read counter";
+            return -1;
+        }
+        fread(&wpc, sizeof(unsigned), 1, trackerPointer);
+        return wpc;
+    }
+
+    RC CounterTracker::getACounter(){
+        int findData = fseek(trackerPointer, sizeof(unsigned)*2, SEEK_SET);
+        unsigned apc;
+        if(findData != 0){
+            cout << "Cant find read counter";
+            return -1;
+        }
+        fread(&apc, sizeof(unsigned), 1, trackerPointer);
+        if(ferror(trackerPointer)){
+            cout << "error in reading";
+            return -1;
+        }
+        return apc;
+    }
+
+    RC CounterTracker::writeRCounter(){
+        unsigned rpc = getRCounter() + 1;
+        int findData = fseek(trackerPointer, 0, SEEK_SET);
+        int sucsess = fwrite(&rpc, sizeof(unsigned), 1, trackerPointer);
+        if(sucsess == 0){
+            cout << "error writing";
+            return -1;
+        }
+        fflush(trackerPointer);
+        return 0;
+    }
+
+    RC CounterTracker::writeWCounter(){
+        unsigned wpc = getWCounter() + 1;
+        int findData = fseek(trackerPointer, sizeof(unsigned), SEEK_SET);
+        int sucsess = fwrite(&wpc, sizeof(unsigned), 1, trackerPointer);
+        if(sucsess == 0){
+            cout << "error writing";
+            return -1;
+        }
+        fflush(trackerPointer);
+        return 0;
+    }
+
+    RC CounterTracker::writeACounter(){
+        unsigned apc = getACounter() + 1;
+        int findData = fseek(trackerPointer, sizeof(unsigned)*2, SEEK_SET);
+        size_t sucsess = fwrite(&apc, sizeof(unsigned), 1, trackerPointer);
+        if(sucsess != 1){
+            cout << "error writing";
+            return -1;
+        }
+        if(ferror(trackerPointer)){
+            cout << "error in writing";
+            return -1;
+        }
+        fflush(trackerPointer);
+        return 0;
+    }
+
 
 } // namespace PeterDB

@@ -25,9 +25,22 @@ namespace PeterDB {
         ~PagedFileManager();                                                // Prevent unwanted destruction
         PagedFileManager(const PagedFileManager &);                         // Prevent construction by copying
         PagedFileManager &operator=(const PagedFileManager &);              // Prevent assignment
-    private:
-        static PagedFileManager &pfm;
 
+    private:
+    };
+
+    class CounterTracker {
+        public:
+            static CounterTracker &instance();
+            RC initCT();
+            RC getRCounter();
+            RC getWCounter();
+            RC getACounter();
+            RC writeRCounter();
+            RC writeWCounter();
+            RC writeACounter();
+            FILE* trackerPointer = nullptr;
+            string fileName = "counterVals";
     };
 
     class FileHandle {
@@ -48,6 +61,8 @@ namespace PeterDB {
                                     unsigned &appendPageCount);                 // Put current counter values into variables
             FILE *filePointer;
             string fileName;
+            CounterTracker ct = CounterTracker();
+                       
     };
 
 } // namespace PeterDB

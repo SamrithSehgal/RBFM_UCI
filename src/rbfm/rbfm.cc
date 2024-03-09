@@ -112,22 +112,29 @@ namespace PeterDB {
             }
         }
 
-        int pages = fileHandle.getNumberOfPages();
+        int pages = fileHandle.getNumberOfPages()-1;
         int freeSpace;
         int takenSlots;
         void* alloPage = malloc(PAGE_SIZE);
         char* curPage = (char*) alloPage;
         int times = 0;
-        if(pages == 0){
+        if(pages < 0){
             pageInit(fileHandle, curPage, record, fields);
             freeSpace = fields;
             takenSlots = 1;
             pages++;
         }
+
+        RID deletedSlotRID;
+    if (findDeletedSlot(fileHandle, deletedSlotRID) == 0) {
+        rid.pageNum = deletedSlotRID.pageNum;
+        rid.slotNum = deletedSlotRID.slotNum;
+        updateSlotStatus(fileHandle, rid, 0); 
+    } 
         else{
 
-            while(pages-1 < fileHandle.getNumberOfPages()){
-                fileHandle.readPage(pages-1, alloPage);
+            while(pages < fileHandle.getNumberOfPages()){
+                fileHandle.readPage(pages, alloPage);
                 memcpy(&freeSpace, &curPage[PAGE_SIZE-4], 4);
                 memcpy(&takenSlots, &curPage[PAGE_SIZE-8], 4);
                 int dirLocation = PAGE_SIZE - takenSlots * 8 - 8;
@@ -139,15 +146,15 @@ namespace PeterDB {
                     memcpy(curPage + PAGE_SIZE - 8, &takenSlots, 4);
                     freeSpace += fields;
                     memcpy(curPage + PAGE_SIZE - 4, &freeSpace, 4);
-                    fileHandle.writePage(pages-1, curPage);
+                    fileHandle.writePage(pages, curPage);
                     break;
                 }
                 else{
-                    if(pages == (fileHandle.getNumberOfPages()) && times == 0){
+                    if((pages+1) == fileHandle.getNumberOfPages() && times == 0){
                         pages = 0;
                         times++;
                     }
-                    else if(pages == (fileHandle.getNumberOfPages()) && times == 1){
+                    else if((pages+1) == fileHandle.getNumberOfPages() && times == 1){
                         pageInit(fileHandle, curPage, record, fields);
                         freeSpace = fields;
                         takenSlots = 1;
@@ -209,7 +216,14 @@ namespace PeterDB {
 	int old = 0;
 	int cur = 0; 
 	int size = 0; 
+        int slotDirOffset = PAGE_SIZE - 8 - (rid.slotNum + 1) * 8;
+        int slotStatus;
+        memcpy(&slotStatus, page + slotDirOffset + 2 * sizeof(int), sizeof(int));
 
+        if (slotStatus == -1) {
+            free(alloPage);
+            return -1; 
+        }
 	for (int i = 0; i < recordDescriptor.size(); i++) {
 		if (!(nullLoc[i / 8] & (1 << (7 - i % 8)))) {
 			switch(recordDescriptor[i].type) {
@@ -239,9 +253,53 @@ namespace PeterDB {
     }
 
     RC RecordBasedFileManager::deleteRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor,
-                                            const RID &rid) {
-        return -1;
-    }
+                                        const RID &rid) {
+    void* pageData = malloc(PAGE_SIZE);
+    fileHandle.readPage(rid.pageNum, pageData);
+    char* page = (char*) (pageData);
+
+    int slotDirOffset = PAGE_SIZE - 8 - rid.slotNum * 8;
+    int slotOffset, slotLength;
+    int recordOffset = PAGE_SIZE - 8 - (rid.slotNum + 1) * 8;
+    int recordStatus = -1; 
+    memcpy(&slotOffset, page + slotDirOffset, 4);
+    memcpy(&slotLength, page + slotDirOffset + 4, 4);
+    memcpy(page + recordOffset + 2 * sizeof(int), &recordStatus, sizeof(int));
+
+    compactPage(page, slotOffset, slotLength);
+
+    fileHandle.writePage(rid.pageNum, page);
+
+    free(pageData);
+    return 0;
+}
+
+void RecordBasedFileManager::compactPage(char* page, int slotOffset, int slotLength) {
+    int numSlots, freeSpace;
+    memcpy(&numSlots, page + PAGE_SIZE - 8, 4);
+    memcpy(&freeSpace, page + PAGE_SIZE - 4, 4);
+
+    char* endOfRecords = page + freeSpace;
+    int slotTableStart = PAGE_SIZE - 8 - numSlots * 8;
+    char* slotTableEnd = page + PAGE_SIZE - 8;
+
+    char* source = endOfRecords - slotOffset - slotLength;
+    char* destination = endOfRecords;
+    int shiftAmount = slotLength;
+
+    memmove(destination, source, shiftAmount);
+
+    int slotDirOffset = slotTableStart - (slotOffset + slotLength);
+    int newSlotOffset = slotOffset + shiftAmount;
+    int newSlotLength = slotLength;
+    memcpy(page + slotDirOffset, &newSlotOffset, 4);
+    memcpy(page + slotDirOffset + 4, &newSlotLength, 4);
+
+    freeSpace += shiftAmount;
+    memcpy(page + PAGE_SIZE - 4, &freeSpace, 4);
+}
+
+
 
     RC RecordBasedFileManager::printRecord(const std::vector<Attribute> &recordDescriptor, const void *data,
                                            std::ostream &out) {
@@ -319,4 +377,3 @@ namespace PeterDB {
     
 
 } // namespace PeterDB
-
