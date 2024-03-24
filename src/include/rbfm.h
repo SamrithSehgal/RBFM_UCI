@@ -12,16 +12,6 @@ namespace PeterDB {
         unsigned short slotNum;     // slot number in the page
     } RID;
 
-    typedef struct{
-        int offset;
-        int length;
-    } slotDir;
-
-    typedef struct{
-        int freeOffset;
-        int availableSlots;
-    } slotHeader;
-
 
     // Attribute
     typedef enum {
@@ -72,9 +62,20 @@ namespace PeterDB {
         // Never keep the results in the memory. When getNextRecord() is called,
         // a satisfying record needs to be fetched from the file.
         // "data" follows the same format as RecordBasedFileManager::insertRecord().
-        RC getNextRecord(RID &rid, void *data) { return RBFM_EOF; };
-
-        RC close() { return -1; };
+        RC getNextRecord(RID &rid, void *data);
+        RC close() { if(curPage != nullptr){free(curPage); curPage = nullptr;} return 0; };
+        bool conditionExists(const void* inBuffer);
+        RC createRes(void* outBuffer, const void* inBuffer);
+        
+        FileHandle fileHandle;
+        CompOp compOp;
+        string conditionAttr;
+        const void* value;
+        vector<Attribute> recordDescriptor;
+        vector<string> attrNames;
+        RID curRid;
+        int totalSlots;
+        char* curPage;
     };
 
     class RecordBasedFileManager {
@@ -88,9 +89,6 @@ namespace PeterDB {
         RC openFile(const std::string &fileName, FileHandle &fileHandle);   // Open a record-based file
 
         RC closeFile(FileHandle &fileHandle);                               // Close a record-based file
-        void compactPage(char* page, int slotOffset, int slotLength);
-        RC findDeletedSlot(FileHandle &fileHandle, RID &rid);
-        RC updateSlotStatus(FileHandle &fileHandle, const RID &rid, int status);
         //  Format of the data passed into the function is the following:
         //  [n byte-null-indicators for y fields] [actual value for the first field] [actual value for the second field] ...
         //  1) For y fields, there is n-byte-null-indicators in the beginning of each record.
@@ -112,7 +110,6 @@ namespace PeterDB {
 
         // Read a record identified by the given rid.
         
-        RC writeRecord(int page, const void* data, RID &rid, int slot, int offset, slotHeader* sh, slotDir* sd, int size, char* alloPage);
         RC pageInit(FileHandle &FileHandle, char* page, unsigned char* record, int fields);
         RC readRecord(FileHandle &fileHandle, const std::vector<Attribute> &recordDescriptor, const RID &rid, void *data);
 

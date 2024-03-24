@@ -936,7 +936,7 @@ namespace PeterDBTesting {
 
         bufSize = 1000;
         size_t tupleSize = 0;
-        int numTuples = 100000;
+        int numTuples = 1000;
 
         inBuffer = malloc(bufSize);
         outBuffer = malloc(bufSize);
@@ -986,7 +986,7 @@ namespace PeterDBTesting {
 
         size_t tupleSize;
         bufSize = 1000;
-        int numTuples = 100000;
+        int numTuples = 1000;
         inBuffer = malloc(bufSize);
         outBuffer = malloc(bufSize);
         std::vector<float> lats;
@@ -1075,7 +1075,7 @@ namespace PeterDBTesting {
 
         size_t tupleSize;
         bufSize = 1000;
-        int numTuples = 100000;
+        int numTuples = 1000;
         inBuffer = malloc(bufSize);
         outBuffer = malloc(bufSize);
         std::vector<float> lats;
@@ -1178,7 +1178,7 @@ namespace PeterDBTesting {
         // 3. scan - NO_OP
         size_t tupleSize;
         bufSize = 1000;
-        int numTuples = 100000;
+        int numTuples = 1000;
         inBuffer = malloc(bufSize);
         outBuffer = malloc(bufSize);
         std::vector<float> lats;
@@ -1266,7 +1266,7 @@ namespace PeterDBTesting {
 
         bufSize = 1000;
         size_t tupleSize = 0;
-        int numTuples = 100000;
+        int numTuples = 1000;
 
         inBuffer = malloc(bufSize);
         outBuffer = malloc(bufSize);

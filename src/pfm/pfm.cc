@@ -76,6 +76,8 @@ namespace PeterDB {
             cout << "Error in closing file";
             return -1;
         }
+        fileHandle.filePointer = NULL;
+        fileHandle.ct.trackerPointer = NULL;
         return 0;
     }
 
@@ -215,7 +217,7 @@ namespace PeterDB {
         int findData = fseek(trackerPointer, sizeof(unsigned), SEEK_SET);
         unsigned wpc;
         if(findData != 0){
-            cout << "Cant find read counter";
+            cout << "Cant find write counter";
             return -1;
         }
         fread(&wpc, sizeof(unsigned), 1, trackerPointer);
@@ -226,7 +228,7 @@ namespace PeterDB {
         int findData = fseek(trackerPointer, sizeof(unsigned)*2, SEEK_SET);
         unsigned apc;
         if(findData != 0){
-            cout << "Cant find read counter";
+            cout << "Cant find append counter";
             return -1;
         }
         fread(&apc, sizeof(unsigned), 1, trackerPointer);

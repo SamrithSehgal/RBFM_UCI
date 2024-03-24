@@ -6,6 +6,8 @@
 
 #include "src/include/rbfm.h"
 
+using namespace std;
+
 namespace PeterDB {
 #define RM_EOF (-1)  // end of a scan operator
 
@@ -20,6 +22,10 @@ namespace PeterDB {
         RC getNextTuple(RID &rid, void *data);
 
         RC close();
+
+        FileHandle fileHandle;
+        RBFM_ScanIterator rbfmIter;
+        
     };
 
     // RM_IndexScanIterator is an iterator to go through index entries
@@ -37,6 +43,10 @@ namespace PeterDB {
     class RelationManager {
     public:
         static RelationManager &instance();
+
+        void readCatalogs();
+        
+        void readEntireTable(const string &tableName);
 
         RC createCatalog();
 
